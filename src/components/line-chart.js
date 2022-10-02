@@ -10,7 +10,8 @@ const LineChart = ({ data }) => {
   const offsetY = 40;
   const paddingX = 50;
   const paddingY = 90;
-  const maxY = Math.max(...data.map((item) => item.additions));
+  const maxAdditionsY = Math.max(...data.map((item) => item.additions));
+  const maxDeletionsY = Math.max(...data.map((item) => -item.deletions));
   const guides = [...Array(16).keys()];
   const hoverBarWidth = 18;
   const tooltipWidth = 200;
@@ -19,25 +20,32 @@ const LineChart = ({ data }) => {
   const properties = data.map((property, index) => {
     const { date, additions, deletions } = property;
     const x = (index / data.length) * (chartWidth - paddingX) + paddingX / 2;
-    const y = chartHeight - offsetY - (additions / maxY) * (chartHeight - (paddingY + offsetY)) - paddingY + offsetY;
+    const additionsY = chartHeight / 2 - (additions / maxAdditionsY) * (chartHeight / 2 + (paddingY / 2 - offsetY * 2));
+    const deletionsY = chartHeight / 2 - (deletions / maxDeletionsY) * (chartHeight / 2 - (paddingY + offsetY / 2));
     return {
       date: date,
       additions: additions,
       deletions: deletions,
       x: x,
-      y: y
+      additionsY: additionsY,
+      deletionsY: deletionsY
     };
   });
 
-  const points = properties.map((point) => {
-    const { x, y } = point;
-    return `${x},${y}`;
+  const pointsAdditions = properties.map((point) => {
+    const { x, additionsY } = point;
+    return `${x},${additionsY}`;
   });
 
-  const handleClick = ({ additions, deletions, date, x, y }) => {
+  const pointsDeletions = properties.map((point) => {
+    const { x, deletionsY } = point;
+    return `${x},${deletionsY}`;
+  });
+
+  const handleClick = ({ additions, deletions, date, x, additionsY }) => {
     const boundingClientRect = svgRef.current.getBoundingClientRect();
     const safeX = x > boundingClientRect.width / 2 ? x - tooltipWidth : x;
-    const safeY = y < boundingClientRect.height / 2 ? y : y - tooltipHeight;
+    const safeY = additionsY < boundingClientRect.height / 2 ? additionsY : additionsY - tooltipHeight;
 
     setTooltip({
       date: date,
@@ -63,10 +71,11 @@ const LineChart = ({ data }) => {
         );
       })}
 
-      <polyline fill="none" className="stroke-purple-800" strokeWidth={2} points={points} />
+      <polyline fill="none" className="stroke-green-400" strokeWidth={2} points={pointsAdditions} />
+      <polyline fill="none" className="stroke-red-400" strokeWidth={2} points={pointsDeletions} />
 
       {properties.map((property, index) => {
-        const { date, additions, deletions, x, y } = property;
+        const { date, additions, deletions, x, additionsY, deletionsY } = property;
 
         return (
           <g key={index}>
@@ -75,24 +84,18 @@ const LineChart = ({ data }) => {
               x={x - hoverBarWidth / 2}
               y={0}
               width={hoverBarWidth}
-              height={chartHeight - paddingY}
-              onClick={() => handleClick({ date, additions, deletions, x, y })}
+              height={chartHeight}
+              onClick={() => handleClick({ date, additions, deletions, x, additionsY })}
             />
-
-            <circle className="stroke-purple-800 fill-white pointer-events-none" cx={x} cy={y} r={5} strokeWidth={2} />
-
-            <g transform={`translate(${x} ${chartHeight - (paddingY - offsetY)})`}>
-              <text transform="rotate(45)" textAnchor="start" transformorigin="50% 50%" fontSize={10} className="fill-gray-500 select-none">
-                {new Date(date).toLocaleDateString(undefined, { year: '2-digit', month: 'numeric', day: 'numeric' })}
-              </text>
-            </g>
+            <circle className="stroke-green-400 fill-white pointer-events-none" cx={x} cy={additionsY} r={5} strokeWidth={2} />
+            <circle className="stroke-red-400 fill-white pointer-events-none" cx={x} cy={deletionsY} r={5} strokeWidth={2} />
 
             {tooltip ? (
               <g className="transition-all duration-300 ease-in-out" transform={`translate(${tooltip.x}, ${tooltip.y})`}>
-                <rect width={tooltipWidth} height={tooltipHeight} className="fill-white stroke-purple-200" rx={3} ry={3} strokeWidth={1.2} />
+                <rect width={tooltipWidth} height={tooltipHeight} className="fill-white stroke-gray-300" rx={3} ry={3} strokeWidth={1.2} />
 
                 <circle
-                  className="fill-purple-100 origin-center [transform-box:fill-box] select-none pointer-events-none motion-safe:animate-ping"
+                  className="fill-gray-100 origin-center [transform-box:fill-box] select-none pointer-events-none motion-safe:animate-ping"
                   cx={tooltipWidth}
                   r={10}
                   width={10}
@@ -100,7 +103,7 @@ const LineChart = ({ data }) => {
                 />
 
                 <circle
-                  className="fill-white stroke-purple-200 cursor-pointer transition-all duration-200 hover:fill-purple-200"
+                  className="fill-white stroke-gray-300 cursor-pointer transition-all duration-200 hover:fill-gray-200"
                   cx={tooltipWidth}
                   r={10}
                   strokeWidth={1.2}
@@ -109,7 +112,7 @@ const LineChart = ({ data }) => {
                   onClick={handleClose}
                 />
 
-                <text className="fill-purple-800 text-[14px] select-none pointer-events-none" x={tooltipWidth - 3.2} y={3.4}>
+                <text className="fill-gray-800 text-[14px] select-none pointer-events-none" x={tooltipWidth - 3.2} y={3.4}>
                   x
                 </text>
 
@@ -130,6 +133,17 @@ const LineChart = ({ data }) => {
                 </text>
               </g>
             ) : null}
+          </g>
+        );
+      })}
+      {properties.map((property, index) => {
+        const { date, x } = property;
+
+        return (
+          <g key={index} transform={`translate(${x} ${chartHeight - (paddingY - offsetY)})`}>
+            <text transform="rotate(45)" textAnchor="start" transformorigin="50% 50%" fontSize={10} className="fill-gray-500 select-none">
+              {new Date(date).toLocaleDateString(undefined, { year: '2-digit', month: 'numeric', day: 'numeric' })}
+            </text>
           </g>
         );
       })}
